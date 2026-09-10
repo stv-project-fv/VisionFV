@@ -1,4 +1,9 @@
 import * as THREE from 'three';
+import {
+  computeBoundingBoxInfo,
+  computeCameraFitDistance,
+  computeCameraPositionFromSpherical,
+} from './cameraMath';
 
 const DAMPING_FACTOR = 0.08;
 const MIN_DISTANCE = 0.5;
@@ -161,14 +166,8 @@ export class CameraRig {
   // ── Focus animation ──────────────────────────────────────────────────────────
 
   public focusOnBounds(box: THREE.Box3, durationMs: number = 800): void {
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const fovRad = THREE.MathUtils.degToRad(this.camera.fov);
-    const distance = (maxDim / 2 / Math.tan(fovRad / 2)) * 1.55;
+    const { center, maxDimension } = computeBoundingBoxInfo(box);
+    const distance = computeCameraFitDistance(maxDimension, this.camera.fov, 1.55);
 
     const startSph = this.targetSpherical.clone();
     const endSph = new THREE.Spherical(
@@ -236,8 +235,9 @@ export class CameraRig {
       this.state.target.copy(this.targetLookAt);
     }
 
-    const offset = new THREE.Vector3().setFromSpherical(this.state.spherical);
-    this.camera.position.copy(this.state.target).add(offset);
+    this.camera.position.copy(
+      computeCameraPositionFromSpherical(this.state.target, this.state.spherical)
+    );
     this.camera.lookAt(this.state.target);
   }
 
