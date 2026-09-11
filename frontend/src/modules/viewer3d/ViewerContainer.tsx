@@ -129,16 +129,16 @@ export const ViewerContainer: React.FC = () => {
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full min-h-[450px] overflow-hidden rounded-xl bg-slate-950 border border-slate-800 shadow-inner"
+      className="relative w-full h-full min-h-[450px] overflow-hidden rounded-xl bg-zinc-950 border border-zinc-800 shadow-inner"
       style={{ cursor: 'grab' }}
     >
       {/* HUD badge */}
       <div className="absolute top-4 left-4 z-10 pointer-events-none flex flex-col gap-1.5">
-        <div className="px-3 py-1.5 rounded-lg bg-slate-900/80 backdrop-blur border border-slate-700/60 text-xs font-medium text-slate-300">
-          3D Viewport &bull; Interactive WebGL
+        <div className="px-3 py-1.5 rounded-lg bg-zinc-900/80 backdrop-blur border border-zinc-700/60 text-xs font-medium text-zinc-300">
+          Vista 3D &bull; WebGL Interactivo
         </div>
         <div className="px-3 py-1 rounded-md bg-blue-600/10 border border-blue-500/20 text-[11px] font-mono text-blue-400">
-          LMB drag orbit &bull; Scroll zoom &bull; Ctrl+drag pan
+          Rotar (clic izq.) &bull; Zoom (rueda) &bull; Desplazar (Ctrl+clic)
         </div>
       </div>
     </div>

@@ -41,81 +41,81 @@ const PartRow: React.FC<RowProps> = ({
       onMouseEnter={() => onHover(part.id)}
       onMouseLeave={() => onHover(null)}
       className={clsx(
-        'cursor-pointer transition-colors duration-100 group',
+        'cursor-pointer transition-colors duration-100 group border-b border-zinc-850/60',
         isSelected
           ? 'bg-blue-600/20 border-l-[3px] border-l-blue-500'
           : isHovered
-          ? 'bg-slate-800/50'
-          : 'hover:bg-slate-800/30'
+          ? 'bg-zinc-800/60'
+          : 'hover:bg-zinc-800/30'
       )}
     >
-      {/* Position */}
-      <td className="py-2.5 px-3 text-center">
+      {/* Position (#) - w-12 */}
+      <td className="py-2 px-2 text-center w-12 shrink-0">
         <span
           className={clsx(
-            'inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold font-mono',
+            'inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold font-mono',
             isSelected
-              ? 'bg-blue-500 text-white'
-              : 'bg-slate-800 text-slate-400 group-hover:bg-slate-700'
+              ? 'bg-blue-500 text-white shadow-sm'
+              : 'bg-zinc-800 text-zinc-400 group-hover:bg-zinc-700 group-hover:text-zinc-200'
           )}
         >
           {position}
         </span>
       </td>
 
-      {/* OEM Code */}
-      <td className="py-2.5 px-3">
-        <span className="font-mono text-xs font-semibold text-blue-400">
+      {/* OEM Code - w-36, whitespace-nowrap font-mono text-xs text-blue-400 */}
+      <td className="py-2 px-2.5 w-36 shrink-0">
+        <span className="whitespace-nowrap font-mono text-xs font-semibold text-blue-400 block truncate">
           {part.oem_code}
         </span>
       </td>
 
-      {/* Name + category */}
-      <td className="py-2.5 px-3 max-w-[200px]">
+      {/* Description / Name + Category - flex-1 */}
+      <td className="py-2 px-2.5 flex-1 min-w-[140px]">
         <p
           className={clsx(
             'text-xs font-medium leading-tight',
-            isSelected ? 'text-blue-100' : 'text-slate-200'
+            isSelected ? 'text-blue-100 font-semibold' : 'text-zinc-200 group-hover:text-white'
           )}
         >
           {part.name}
         </p>
         {part.category && (
-          <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
-            <Tag className="w-2.5 h-2.5" />
-            {part.category}
+          <p className="text-[10px] text-zinc-400 mt-0.5 flex items-center gap-1">
+            <Tag className="w-2.5 h-2.5 text-zinc-500" />
+            <span className="truncate">{part.category}</span>
           </p>
         )}
       </td>
 
-      {/* Torque */}
-      <td className="py-2.5 px-3">
+      {/* Torque Specs - w-24 subtle technical tag */}
+      <td className="py-2 px-2.5 w-24 shrink-0 whitespace-nowrap">
         {part.torque_spec ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-mono font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-            <Wrench className="w-2.5 h-2.5" />
-            {part.torque_spec}
+          <span className="inline-flex items-center gap-1 border border-zinc-700 bg-zinc-800 px-2 py-0.5 rounded font-mono text-xs text-zinc-300 shadow-sm">
+            <Wrench className="w-2.5 h-2.5 text-zinc-400" />
+            <span>{part.torque_spec}</span>
           </span>
         ) : (
-          <span className="text-slate-600 text-xs">—</span>
+          <span className="text-zinc-600 text-xs font-mono">—</span>
         )}
       </td>
 
-      {/* Action */}
-      <td className="py-2.5 px-3 text-center">
+      {/* Action / Manual - w-20 */}
+      <td className="py-2 px-2 text-center w-20 shrink-0 whitespace-nowrap">
         {part.manual_page != null ? (
           <button
             onClick={(e) => {
               e.stopPropagation();
               onOpenManual(part.id);
             }}
-            title={`Open manual page ${part.manual_page}`}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-800 hover:bg-amber-500/20 hover:border-amber-500/40 border border-slate-700 text-slate-400 hover:text-amber-400 transition text-[10px] font-mono"
+            title={`Abrir página ${part.manual_page} del manual`}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-800/90 hover:bg-amber-500/20 hover:border-amber-500/40 border border-zinc-700/80 text-zinc-400 hover:text-amber-400 transition text-[10px] font-mono shadow-sm"
           >
-            <BookOpen className="w-3 h-3" />
-            p.{part.manual_page}
+            <BookOpen className="w-3 h-3 text-amber-400" />
+            <span>pág.{part.manual_page}</span>
           </button>
         ) : (
-          <span className="text-slate-600 text-xs">—</span>
+          <span className="text-zinc-600 text-xs font-mono">—</span>
         )}
       </td>
     </tr>
@@ -144,48 +144,48 @@ export const PartsTable: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+    <div className="flex flex-col h-full bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-slate-800 bg-slate-900/95 flex items-center justify-between shrink-0">
+      <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-900 flex items-center justify-between shrink-0">
         <div>
-          <h2 className="text-xs font-bold uppercase tracking-widest text-slate-100">
-            Engineering BOM (eBOM)
+          <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-200">
+            Lista de Materiales (eBOM)
           </h2>
           {currentAssembly && (
-            <p className="text-[11px] text-slate-500 mt-0.5 truncate max-w-[220px]">
+            <p className="text-[11px] text-zinc-400 mt-0.5 truncate max-w-[220px]">
               {currentAssembly.name}
             </p>
           )}
         </div>
-        <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-          {parts.length} items
+        <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">
+          {parts.length} componentes
         </span>
       </div>
 
       {/* Empty state */}
       {parts.length === 0 && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-slate-600">
-          <AlertCircle className="w-8 h-8 text-slate-700" />
-          <p className="text-xs">No parts loaded.</p>
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-zinc-500 p-6 text-center">
+          <AlertCircle className="w-8 h-8 text-zinc-600" />
+          <p className="text-xs font-medium">No hay piezas cargadas para este subsistema.</p>
         </div>
       )}
 
-      {/* Scrollable table */}
+      {/* Scrollable table body */}
       {parts.length > 0 && (
-        <div className="flex-1 overflow-y-auto overflow-x-hidden">
-          <table className="w-full border-collapse text-left">
-            <thead className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur text-[10px] uppercase tracking-widest text-slate-500">
-              <tr className="border-b border-slate-800">
-                <th className="py-2 px-3 text-center w-8">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+          <table className="w-full border-collapse text-left table-fixed">
+            <thead className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur text-[10px] uppercase tracking-wider text-zinc-400 border-b border-zinc-800">
+              <tr>
+                <th className="py-2.5 px-2 text-center w-12">
                   <Hash className="w-3 h-3 inline" />
                 </th>
-                <th className="py-2 px-3">OEM Code</th>
-                <th className="py-2 px-3">Denomination</th>
-                <th className="py-2 px-3">Torque</th>
-                <th className="py-2 px-3 text-center">Manual</th>
+                <th className="py-2.5 px-2.5 w-36">Código OEM</th>
+                <th className="py-2.5 px-2.5">Denominación</th>
+                <th className="py-2.5 px-2.5 w-24">Torque</th>
+                <th className="py-2.5 px-2 text-center w-20">Manual</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody className="divide-y divide-zinc-800/60">
               {parts.map((part, i) => (
                 <PartRow
                   key={part.id}
@@ -205,14 +205,14 @@ export const PartsTable: React.FC = () => {
 
       {/* Footer */}
       {parts.length > 0 && (
-        <div className="shrink-0 px-4 py-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-600">
-          <span>Click row to select · Click 3D model to highlight</span>
+        <div className="shrink-0 px-4 py-2 border-t border-zinc-800 flex items-center justify-between text-[10px] text-zinc-400 bg-zinc-950/40">
+          <span className="truncate">Clic en fila para seleccionar · Clic en modelo 3D para aislar</span>
           {selectedPartId && (
             <button
               onClick={() => setSelectedPartId(null)}
-              className="text-blue-400 hover:text-blue-300 transition"
+              className="text-blue-400 hover:text-blue-300 font-medium transition ml-2 shrink-0"
             >
-              Clear selection
+              Limpiar selección
             </button>
           )}
         </div>

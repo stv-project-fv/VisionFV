@@ -63,13 +63,13 @@
    ```bash
    npm install
    ```
-3. Iniciar el servidor de desarrollo de Vite (configurado en el puerto **3000**):
+3. Iniciar el servidor de desarrollo de Vite (configurado en el puerto **3001**):
    ```bash
    npm run dev
    ```
 4. Abrir en el navegador:
    ```
-   http://localhost:3000
+   http://localhost:3001
    ```
 
 ---

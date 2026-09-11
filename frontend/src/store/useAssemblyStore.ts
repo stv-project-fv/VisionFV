@@ -3,6 +3,7 @@ import type {
   ActiveTab,
   AppView,
   AssemblyDetail,
+  NavigationTreeNode,
   PartEntity,
   VehicleCategory,
   VehicleDetail,
@@ -11,13 +12,14 @@ import type {
 import { api } from '@/services/api';
 
 interface AssemblyState {
-  // ── App view ────────────────────────────────────────────────────────────────
+  // ── App view (legacy, kept for Header compat) ────────────────────────────────
   appView: AppView;
 
   // ── Fleet state ─────────────────────────────────────────────────────────────
   vehicles: VehicleEntity[];
   selectedVehicle: VehicleDetail | null;
   vehicleCategoryFilter: VehicleCategory | null;
+  searchQuery: string;
   isLoadingVehicles: boolean;
   vehiclesError: string | null;
 
@@ -30,10 +32,15 @@ interface AssemblyState {
   isLoading: boolean;
   error: string | null;
 
+  // ── Tree navigation state ────────────────────────────────────────────────────
+  expandedNodeIds: string[];
+  selectedNodeId: string | null;
+
   // ── Fleet actions ────────────────────────────────────────────────────────────
   fetchVehicles: (category?: VehicleCategory) => Promise<void>;
   fetchVehicleDetail: (id: string) => Promise<void>;
   setVehicleCategoryFilter: (cat: VehicleCategory | null) => void;
+  setSearchQuery: (query: string) => void;
   setSelectedVehicle: (vehicle: VehicleDetail | null) => void;
 
   // ── Workspace actions ────────────────────────────────────────────────────────
@@ -49,15 +56,20 @@ interface AssemblyState {
   // ── Navigation ───────────────────────────────────────────────────────────────
   setAppView: (view: AppView) => void;
   openAssemblyWorkspace: (assemblyId: string) => Promise<void>;
+
+  // ── Tree navigation actions ──────────────────────────────────────────────────
+  toggleNode: (nodeId: string) => void;
+  selectNode: (node: NavigationTreeNode) => Promise<void>;
 }
 
 export const useAssemblyStore = create<AssemblyState>((set, get) => ({
   // ── Initial state ─────────────────────────────────────────────────────────
-  appView: 'fleet',
+  appView: 'workspace',
 
   vehicles: [],
   selectedVehicle: null,
   vehicleCategoryFilter: null,
+  searchQuery: '',
   isLoadingVehicles: false,
   vehiclesError: null,
 
@@ -68,6 +80,9 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
   activeTab: 'split',
   isLoading: false,
   error: null,
+
+  expandedNodeIds: [],
+  selectedNodeId: null,
 
   // ── Fleet actions ──────────────────────────────────────────────────────────
 
@@ -97,7 +112,21 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
     }
   },
 
-  setVehicleCategoryFilter: (cat) => set({ vehicleCategoryFilter: cat }),
+  setVehicleCategoryFilter: (cat) => {
+    const { selectedVehicle } = get();
+    if (cat !== null && selectedVehicle && selectedVehicle.category !== cat) {
+      set({
+        vehicleCategoryFilter: cat,
+        selectedVehicle: null,
+        currentAssembly: null,
+        selectedPartId: null,
+      });
+    } else {
+      set({ vehicleCategoryFilter: cat });
+    }
+  },
+
+  setSearchQuery: (query) => set({ searchQuery: query }),
 
   setSelectedVehicle: (vehicle) => set({ selectedVehicle: vehicle }),
 
@@ -148,6 +177,65 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
     } catch (err) {
       const msg = err instanceof Error ? err.message : `Failed to load assembly ${assemblyId}`;
       set({ error: msg, isLoading: false });
+    }
+  },
+
+  // ── Tree navigation actions ────────────────────────────────────────────────
+
+  toggleNode: (nodeId: string) => {
+    const { expandedNodeIds } = get();
+    const isExpanded = expandedNodeIds.includes(nodeId);
+    set({
+      expandedNodeIds: isExpanded
+        ? expandedNodeIds.filter((id) => id !== nodeId)
+        : [...expandedNodeIds, nodeId],
+    });
+  },
+
+  selectNode: async (node: NavigationTreeNode) => {
+    set({ selectedNodeId: node.id });
+
+    switch (node.type) {
+      case 'category':
+        // Just toggle expand/collapse
+        get().toggleNode(node.id);
+        break;
+
+      case 'vehicle': {
+        if (!node.vehicleId) break;
+        // Expand this node and fetch vehicle detail
+        const { expandedNodeIds } = get();
+        if (!expandedNodeIds.includes(node.id)) {
+          set({ expandedNodeIds: [...expandedNodeIds, node.id] });
+        }
+        await get().fetchVehicleDetail(node.vehicleId);
+        break;
+      }
+
+      case 'subsystem': {
+        if (!node.assemblyId) break;
+        // Load the assembly and switch to 3D view
+        set({ isLoading: true, error: null, activeTab: 'split' });
+        try {
+          const assembly = await api.getAssembly(node.assemblyId);
+          set({
+            currentAssembly: assembly,
+            selectedPartId: null,
+            hoveredPartId: null,
+            isLoading: false,
+            explosionFactor: 0,
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : `Failed to load assembly ${node.assemblyId}`;
+          set({ error: msg, isLoading: false });
+        }
+        break;
+      }
+
+      case 'manual':
+        // Switch center panel to manual view; URL/page can be stored in node
+        set({ activeTab: 'manual' });
+        break;
     }
   },
 }));

@@ -177,6 +177,30 @@ describe('useAssemblyStore', () => {
       expect(useAssemblyStore.getState().activeTab).toBe('3d');
     });
 
+    it('isolates category filter by deselecting incompatible active vehicle', () => {
+      const store = useAssemblyStore.getState();
+      store.setSelectedVehicle(mockVehicle); // Category: Motoniveladoras
+      store.setCurrentAssembly(mockAssembly);
+      store.setSelectedPartId('P-6BT-001');
+
+      expect(useAssemblyStore.getState().selectedVehicle).not.toBeNull();
+
+      // Switch to a different category, e.g. Camionetas
+      store.setVehicleCategoryFilter('Camionetas');
+
+      const state = useAssemblyStore.getState();
+      expect(state.vehicleCategoryFilter).toBe('Camionetas');
+      expect(state.selectedVehicle).toBeNull();
+      expect(state.currentAssembly).toBeNull();
+      expect(state.selectedPartId).toBeNull();
+    });
+
+    it('updates search query state', () => {
+      const store = useAssemblyStore.getState();
+      store.setSearchQuery('Hilux');
+      expect(useAssemblyStore.getState().searchQuery).toBe('Hilux');
+    });
+
     it('fetches vehicles and updates store state', async () => {
       const vehicles: VehicleEntity[] = [
         {

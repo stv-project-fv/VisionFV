@@ -28,7 +28,7 @@ cd frontend
 npm install
 npm run dev
 ```
-- Aplicación Web: `http://localhost:3000`
+- Aplicación Web: `http://localhost:3001`
 
 ---
 

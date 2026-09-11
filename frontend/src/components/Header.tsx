@@ -1,68 +1,76 @@
 import React from 'react';
-import { Box, Sparkles, Layers, BookOpen, Columns } from 'lucide-react';
+import { Box, Sparkles, Search, X } from 'lucide-react';
 import { useAssemblyStore } from '@/store/useAssemblyStore';
-import clsx from 'clsx';
-import type { ActiveTab } from '@/types';
 
 export const Header: React.FC = () => {
-  const activeTab = useAssemblyStore((s) => s.activeTab);
-  const setActiveTab = useAssemblyStore((s) => s.setActiveTab);
+  const selectedVehicle = useAssemblyStore((s) => s.selectedVehicle);
   const currentAssembly = useAssemblyStore((s) => s.currentAssembly);
+  const searchQuery     = useAssemblyStore((s) => s.searchQuery);
+  const setSearchQuery  = useAssemblyStore((s) => s.setSearchQuery);
 
-  const tabs: { id: ActiveTab; label: string; icon: React.FC<{ className?: string }> }[] = [
-    { id: 'split', label: 'Split View', icon: Columns },
-    { id: '3d', label: '3D Viewport', icon: Layers },
-    { id: 'manual', label: 'Service Manual', icon: BookOpen },
-  ];
+  // Dynamic subtitle based on current selection
+  const headerSubtitle = React.useMemo(() => {
+    if (selectedVehicle && currentAssembly) {
+      return `${selectedVehicle.brand} ${selectedVehicle.model} — ${currentAssembly.name}`;
+    }
+    if (selectedVehicle) {
+      return `${selectedVehicle.brand} ${selectedVehicle.model} (${selectedVehicle.internal_code})`;
+    }
+    return 'Catálogo Interactivo 3D & Suite eBOM';
+  }, [selectedVehicle, currentAssembly]);
 
   return (
-    <header className="h-16 px-6 bg-slate-900 border-b border-slate-800 flex items-center justify-between shadow-md">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
-          <Box className="w-5 h-5 text-white" />
+    <header className="h-14 px-4 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between shadow-md shrink-0 gap-3">
+      {/* Brand */}
+      <div className="flex items-center gap-3 min-w-0 shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
+          <Box className="w-4 h-4 text-white" />
         </div>
-        <div>
+        <div className="min-w-0 hidden sm:block">
           <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold text-slate-100 tracking-tight">
+            <span className="text-sm font-bold text-zinc-100 tracking-tight">
               VISION3DPARTS
-            </h1>
-            <span className="px-2 py-0.5 text-[10px] font-semibold uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-full">
-              v1.0 Pro
+            </span>
+            <span className="px-1.5 py-0.5 text-[9px] font-semibold uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-full">
+              v1.0
             </span>
           </div>
-          <p className="text-xs text-slate-400">
-            {currentAssembly ? currentAssembly.name : '3D Interactive Parts Catalog & eBOM Suite'}
+          <p className="text-[10px] text-zinc-500 truncate max-w-[260px]" title={headerSubtitle}>
+            {headerSubtitle}
           </p>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
+      {/* Center: Search bar — always visible (used by TreeExplorer) */}
+      <div className="flex-1 max-w-sm">
+        <div className="relative w-full">
+          <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar vehículo, modelo o código..."
+            className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+          />
+          {searchQuery && (
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={clsx(
-                'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-150',
-                isActive
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              )}
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition"
+              title="Limpiar búsqueda"
             >
-              <Icon className="w-4 h-4" />
-              {tab.label}
+              <X className="w-3.5 h-3.5" />
             </button>
-          );
-        })}
+          )}
+        </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
+      {/* Right: Connection badge */}
+      <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 shadow-sm">
           <Sparkles className="w-3.5 h-3.5" />
-          <span className="font-medium">Backend Connected</span>
+          <span className="font-medium hidden md:inline">Backend Conectado</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
         </div>
       </div>
     </header>

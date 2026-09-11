@@ -113,7 +113,21 @@ export interface PartEntity {
 
 export type ActiveTab = '3d' | 'manual' | 'split';
 export type ViewMode = 'orbit' | 'explode' | 'isolate' | 'section';
+/** @deprecated Kept for backward compat; tree explorer replaces fleet/workspace toggle */
 export type AppView = 'fleet' | 'workspace';
+
+// ── Navigation tree ───────────────────────────────────────────────────────────
+
+export interface NavigationTreeNode {
+  readonly id: string;
+  readonly label: string;
+  readonly type: 'category' | 'vehicle' | 'subsystem' | 'manual';
+  readonly vehicleId?: string;
+  readonly assemblyId?: string;
+  readonly manualUrl?: string;
+  readonly manualPage?: number;
+  readonly children?: NavigationTreeNode[];
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

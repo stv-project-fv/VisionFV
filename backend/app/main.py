@@ -1,48 +1,38 @@
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.api import api_router
-from app.core.config import settings
-from app.core.database import Base, engine
+from app.api.routes.api import api_router
 
-
-@asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
-    # Initialize database tables on startup
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    # Cleanup database connection pool on shutdown
-    await engine.dispose()
-
-
+# 1. Instanciar FastAPI con la ruta /docs explícita
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    docs_url=f"{settings.API_V1_STR}/docs",
-    redoc_url=f"{settings.API_V1_STR}/redoc",
-    lifespan=lifespan,
+    title="Parts Catalog & Fleet eBOM API",
+    version="1.0.0",
+    docs_url="/docs",      # Habilita Swagger UI en /docs
+    redoc_url="/redoc",    # Habilita ReDoc en /redoc
 )
 
-# Set up CORS middleware
-if settings.CORS_ORIGINS:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+origins = [
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 
-app.include_router(api_router, prefix=settings.API_V1_STR)
+# 2. Configurar CORS para permitir peticiones desde el Frontend (Vite / React)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],  # Habilita GET, POST, OPTIONS, PUT, DELETE, etc.
+    allow_headers=["*"],
+)
+
+# 3. Incluir todas las rutas de la API bajo el prefijo /api/v1
+app.include_router(api_router, prefix="/api/v1")
 
 
-@app.get("/", tags=["root"])
-async def root() -> dict[str, str]:
-    return {
-        "message": "Welcome to 3D Interactive Parts Catalog & eBOM Suite API",
-        "docs": f"{settings.API_V1_STR}/docs",
-    }
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "API running. Go to /docs for interactive documentation."}

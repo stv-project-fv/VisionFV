@@ -1,44 +1,19 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Loader2, AlertCircle, RefreshCw, Truck } from 'lucide-react';
 import { useAssemblyStore } from '@/store/useAssemblyStore';
 import { VehicleCard } from './VehicleCard';
+import { CategoryFilter } from './CategoryFilter';
 import type { VehicleCategory, VehicleEntity } from '@/types';
-import { VEHICLE_CATEGORIES, VEHICLE_CATEGORY_ICONS } from '@/types';
-import clsx from 'clsx';
-
-// ── Filter tab ──────────────────────────────────────────────────────────────
-
-const FilterTab: React.FC<{
-  label: string;
-  icon?: string;
-  active: boolean;
-  onClick: () => void;
-}> = ({ label, icon, active, onClick }) => (
-  <button
-    onClick={onClick}
-    className={clsx(
-      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap',
-      active
-        ? 'bg-blue-600 text-white shadow'
-        : 'text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800 hover:bg-slate-800'
-    )}
-  >
-    {icon && <span className="text-sm leading-none">{icon}</span>}
-    {label}
-  </button>
-);
-
-// ── VehicleGrid ──────────────────────────────────────────────────────────────
 
 export const VehicleGrid: React.FC = () => {
-  const vehicles            = useAssemblyStore((s) => s.vehicles);
-  const selectedVehicle     = useAssemblyStore((s) => s.selectedVehicle);
+  const vehicles = useAssemblyStore((s) => s.vehicles);
+  const selectedVehicle = useAssemblyStore((s) => s.selectedVehicle);
   const vehicleCategoryFilter = useAssemblyStore((s) => s.vehicleCategoryFilter);
-  const isLoadingVehicles   = useAssemblyStore((s) => s.isLoadingVehicles);
-  const vehiclesError       = useAssemblyStore((s) => s.vehiclesError);
-  const fetchVehicles       = useAssemblyStore((s) => s.fetchVehicles);
-  const fetchVehicleDetail  = useAssemblyStore((s) => s.fetchVehicleDetail);
-  const setVehicleCategoryFilter = useAssemblyStore((s) => s.setVehicleCategoryFilter);
+  const searchQuery = useAssemblyStore((s) => s.searchQuery);
+  const isLoadingVehicles = useAssemblyStore((s) => s.isLoadingVehicles);
+  const vehiclesError = useAssemblyStore((s) => s.vehiclesError);
+  const fetchVehicles = useAssemblyStore((s) => s.fetchVehicles);
+  const fetchVehicleDetail = useAssemblyStore((s) => s.fetchVehicleDetail);
 
   // Initial load
   useEffect(() => {
@@ -49,22 +24,42 @@ export const VehicleGrid: React.FC = () => {
     fetchVehicleDetail(vehicle.id);
   };
 
-  const handleCategoryFilter = (cat: VehicleCategory | null): void => {
-    setVehicleCategoryFilter(cat);
-    fetchVehicles(cat ?? undefined);
-  };
+  // Extract categories present in current vehicle catalog
+  const presentCategories = useMemo(() => {
+    return [...new Set(vehicles.map((v) => v.category))].sort() as VehicleCategory[];
+  }, [vehicles]);
 
-  // Categories present in current vehicle list (for dynamic filter)
-  const presentCategories = [...new Set(vehicles.map((v) => v.category))].sort();
+  // Filter vehicles by category and text search query
+  const filteredVehicles = useMemo(() => {
+    return vehicles.filter((v) => {
+      // Category filter
+      if (vehicleCategoryFilter && v.category !== vehicleCategoryFilter) {
+        return false;
+      }
+      // Search query filter (matches model, brand, internal_code, category)
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesBrand = v.brand.toLowerCase().includes(q);
+        const matchesModel = v.model.toLowerCase().includes(q);
+        const matchesCode = v.internal_code.toLowerCase().includes(q);
+        const matchesCat = v.category.toLowerCase().includes(q);
+        if (!matchesBrand && !matchesModel && !matchesCode && !matchesCat) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [vehicles, vehicleCategoryFilter, searchQuery]);
 
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 px-1 pb-4 flex items-center justify-between gap-4">
+      <div className="shrink-0 px-1 pb-3 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-sm font-bold text-slate-100">Fleet Catalog</h2>
-          <p className="text-[11px] text-slate-500">
-            {vehicles.length} unit{vehicles.length !== 1 ? 's' : ''} registered
+          <h2 className="text-sm font-bold text-zinc-100 tracking-tight">Catálogo de Flota</h2>
+          <p className="text-[11px] text-zinc-400">
+            {filteredVehicles.length} {filteredVehicles.length === 1 ? 'unidad disponible' : 'unidades disponibles'}
+            {vehicles.length !== filteredVehicles.length && ` (${vehicles.length} total)`}
           </p>
         </div>
 
@@ -74,53 +69,38 @@ export const VehicleGrid: React.FC = () => {
             className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 transition"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            Retry
+            Reintentar
           </button>
         )}
       </div>
 
-      {/* ── Category filter bar ─────────────────────────────────────────────── */}
-      <div className="shrink-0 flex items-center gap-2 pb-4 overflow-x-auto">
-        <FilterTab
-          label="All"
-          active={vehicleCategoryFilter === null}
-          onClick={() => handleCategoryFilter(null)}
-        />
-        {VEHICLE_CATEGORIES.filter((c) => presentCategories.includes(c)).map((cat) => (
-          <FilterTab
-            key={cat}
-            label={cat}
-            icon={VEHICLE_CATEGORY_ICONS[cat]}
-            active={vehicleCategoryFilter === cat}
-            onClick={() => handleCategoryFilter(cat)}
-          />
-        ))}
-      </div>
+      {/* ── Category & Search Filter Bar ────────────────────────────────────── */}
+      <CategoryFilter presentCategories={presentCategories} />
 
-      {/* ── Content ────────────────────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      {/* ── Vehicle Cards Grid with Custom Scrollbar ────────────────────────── */}
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
         {isLoadingVehicles ? (
-          <div className="flex items-center justify-center h-full gap-3 text-slate-500">
+          <div className="flex items-center justify-center h-full gap-3 text-zinc-400">
             <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
-            <span className="text-sm">Loading fleet…</span>
+            <span className="text-sm">Cargando flota...</span>
           </div>
         ) : vehiclesError && vehicles.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-6">
             <AlertCircle className="w-8 h-8 text-amber-500" />
-            <p className="text-sm text-slate-400">Fleet data unavailable</p>
-            <p className="text-xs text-slate-600">{vehiclesError}</p>
+            <p className="text-sm text-zinc-300">Datos de flota no disponibles</p>
+            <p className="text-xs text-zinc-500">{vehiclesError}</p>
           </div>
-        ) : vehicles.length === 0 ? (
+        ) : filteredVehicles.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-6">
-            <Truck className="w-10 h-10 text-slate-700" />
-            <p className="text-sm text-slate-500">No vehicles found</p>
-            <p className="text-xs text-slate-600">
-              Start the backend and run <code className="font-mono text-slate-400">POST /api/v1/seed/fleet</code>
+            <Truck className="w-10 h-10 text-zinc-700" />
+            <p className="text-sm text-zinc-400">No se encontraron vehículos</p>
+            <p className="text-xs text-zinc-500">
+              Pruebe cambiando los filtros o busque por otro término.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pr-1">
-            {vehicles.map((vehicle) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-2">
+            {filteredVehicles.map((vehicle) => (
               <VehicleCard
                 key={vehicle.id}
                 vehicle={vehicle}
