@@ -5,6 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 # ── Enum literals (mirrors SQL enums) ────────────────────────────────────────
 
+DocumentType = Literal["PARTS_MANUAL", "OPERATION_MANUAL"]
+
 VehicleCategory = Literal[
     "Aplanadoras",
     "Autoelevadores",
@@ -46,6 +48,9 @@ class PartBase(BaseModel):
     torque_spec: str | None = Field(default=None, description="Torque specification in Nm")
     manual_page: int | None = Field(
         default=None, ge=1, description="Associated service manual page"
+    )
+    figure_code: str | None = Field(
+        default=None, description="Figure/diagram code in the parts manual (e.g. FIG 01-02)"
     )
     explode_vector_x: float = Field(default=0.0, description="Explode direction X")
     explode_vector_y: float = Field(default=0.0, description="Explode direction Y")
@@ -157,3 +162,29 @@ class VehicleDetailResponse(VehicleResponse):
     )
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ── Manual Document schemas ────────────────────────────────────────────────────
+
+
+class ManualDocumentResponse(BaseModel):
+    """Public representation of a ManualDocument record."""
+
+    id: str
+    vehicle_id: str
+    doc_type: str
+    title: str
+    filename: str
+    total_pages: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UploadManualResponse(BaseModel):
+    """Response returned after uploading a manual PDF."""
+
+    manual: ManualDocumentResponse
+    parts_extracted: int = Field(
+        default=0, description="Number of eBOM parts extracted from the PDF (PARTS_MANUAL only)"
+    )

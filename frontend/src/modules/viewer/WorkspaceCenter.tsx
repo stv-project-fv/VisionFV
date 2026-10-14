@@ -12,6 +12,7 @@ import {
 import { useAssemblyStore } from '@/store/useAssemblyStore';
 import { ViewportComponent } from '@/modules/viewer3d/ViewportComponent';
 import { ManualDrawer } from '@/modules/manuals/ManualDrawer';
+import { ManualViewer } from '@/modules/manuals/ManualViewer';
 import clsx from 'clsx';
 import type { ActiveTab } from '@/types';
 
@@ -216,10 +217,10 @@ export const WorkspaceCenter: React.FC = () => {
             </div>
           )}
 
-          {/* Manual Only */}
+          {/* Manual Only — full-screen PDF viewer */}
           {activeTab === 'manual' && (
             <div className="flex-1 min-h-0">
-              <ManualDrawer />
+              <ManualViewer />
             </div>
           )}
 

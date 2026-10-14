@@ -1,3 +1,4 @@
+import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -49,6 +50,13 @@ ASSEMBLY_CATEGORIES = (
     "Hidráulico",
     "Chasis",
 )
+
+
+class DocumentType(enum.Enum):
+    """Type of technical document uploaded for a vehicle."""
+
+    PARTS_MANUAL = "PARTS_MANUAL"
+    OPERATION_MANUAL = "OPERATION_MANUAL"
 
 
 # ── Join table: Vehicle ↔ Assembly (M2M) ──────────────────────────────────────
@@ -107,6 +115,14 @@ class Vehicle(Base):
         lazy="selectin",
     )
 
+    # PDF manuals uploaded for this vehicle
+    manuals: Mapped[list["ManualDocument"]] = relationship(
+        "ManualDocument",
+        back_populates="vehicle",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
 
 # ── Assembly ──────────────────────────────────────────────────────────────────
 
@@ -160,6 +176,7 @@ class Part(Base):
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
     torque_spec: Mapped[str | None] = mapped_column(String(64), nullable=True)
     manual_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    figure_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # 3D explode vectors
     explode_vector_x: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
@@ -174,3 +191,29 @@ class Part(Base):
     )
 
     assembly: Mapped["Assembly"] = relationship("Assembly", back_populates="parts")
+
+
+# ── ManualDocument ────────────────────────────────────────────────────────────
+
+class ManualDocument(Base):
+    """PDF technical document (parts catalog or operation manual) associated with a vehicle."""
+
+    __tablename__ = "manual_documents"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    vehicle_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    doc_type: Mapped[str] = mapped_column(
+        Enum(DocumentType, name="document_type_enum"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_path: Mapped[str] = mapped_column(String(512), nullable=False)
+    total_pages: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    vehicle: Mapped["Vehicle"] = relationship("Vehicle", back_populates="manuals")

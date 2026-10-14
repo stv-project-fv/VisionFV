@@ -1,106 +1,298 @@
-import React, { useState } from 'react';
-import { useAssemblyStore } from '@/store/useAssemblyStore';
-import { BookOpen, ChevronLeft, ChevronRight, FileText, AlertCircle } from 'lucide-react';
+﻿import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useAssemblyStore } from "@/store/useAssemblyStore";
+import { api } from "@/services/api";
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn,
+  ZoomOut,
+  Loader2,
+  AlertCircle,
+  FileText,
+} from "lucide-react";
+import clsx from "clsx";
 
-export const ManualViewer: React.FC = () => {
-  const getSelectedPart = useAssemblyStore((s) => s.getSelectedPart);
-  const currentAssembly = useAssemblyStore((s) => s.currentAssembly);
+// ---------------------------------------------------------------------------
+// pdfjs bootstrap
+// ---------------------------------------------------------------------------
 
-  const selectedPart = getSelectedPart();
-  const [currentPage, setCurrentPage] = useState<number>(selectedPart?.manual_page ?? 1);
-  const [prevPartId, setPrevPartId] = useState<string | null>(selectedPart?.id ?? null);
+// Dynamic import to avoid issues at module-load time before vite processes the worker
+type PdfjsLib = typeof import("pdfjs-dist");
+let pdfjsLib: PdfjsLib | null = null;
 
-  if (selectedPart && selectedPart.id !== prevPartId) {
-    setPrevPartId(selectedPart.id);
-    if (selectedPart.manual_page) {
-      setCurrentPage(selectedPart.manual_page);
+async function getPdfjsLib(): Promise<PdfjsLib> {
+  if (pdfjsLib) return pdfjsLib;
+  const lib = await import("pdfjs-dist");
+  // Use the bundled worker shim (no extra file needed with vite)
+  lib.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.mjs",
+    import.meta.url
+  ).href;
+  pdfjsLib = lib;
+  return lib;
+}
+
+// ---------------------------------------------------------------------------
+// ManualViewer
+// ---------------------------------------------------------------------------
+
+interface ManualViewerProps {
+  /** When true, render in a compact mode suitable for embedding in ManualDrawer */
+  compact?: boolean;
+}
+
+export const ManualViewer: React.FC<ManualViewerProps> = ({ compact = false }) => {
+  const activeManual   = useAssemblyStore((s) => s.activeManual);
+  const currentPage    = useAssemblyStore((s) => s.currentPage);
+  const setCurrentPage = useAssemblyStore((s) => s.setCurrentPage);
+
+  const canvasRef    = useRef<HTMLCanvasElement>(null);
+  const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
+
+  const [totalPages, setTotalPages]   = useState(0);
+  const [scale, setScale]             = useState(1.2);
+  const [isLoading, setIsLoading]     = useState(false);
+  const [pageInput, setPageInput]     = useState(String(currentPage));
+  const [error, setError]             = useState<string | null>(null);
+
+  // Keep pdfDocument in a ref to avoid re-creating it on every page change
+  const pdfDocRef = useRef<import("pdfjs-dist").PDFDocumentProxy | null>(null);
+  const currentUrlRef = useRef<string>("");
+
+  // ---------------------------------------------------------------------------
+  // Load/reload the PDF when activeManual changes
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!activeManual) {
+      pdfDocRef.current = null;
+      setTotalPages(0);
+      return;
     }
-  } else if (!selectedPart && prevPartId !== null) {
-    setPrevPartId(null);
+
+    const url = api.getManualFileUrl(activeManual.id);
+
+    if (currentUrlRef.current === url && pdfDocRef.current) {
+      // Same document, just re-render current page
+      renderPage(currentPage);
+      return;
+    }
+
+    let cancelled = false;
+    currentUrlRef.current = url;
+    setIsLoading(true);
+    setError(null);
+
+    (async () => {
+      try {
+        const lib = await getPdfjsLib();
+        const loadingTask = lib.getDocument({ url });
+        const pdf = await loadingTask.promise;
+        if (cancelled) return;
+        pdfDocRef.current = pdf;
+        setTotalPages(pdf.numPages);
+        renderPage(1);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Error al cargar el PDF");
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeManual]);
+
+  // ---------------------------------------------------------------------------
+  // Re-render when currentPage changes
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (pdfDocRef.current) {
+      renderPage(currentPage);
+    }
+    setPageInput(String(currentPage));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, scale]);
+
+  const renderPage = useCallback(
+    async (pageNum: number) => {
+      const pdf = pdfDocRef.current;
+      const canvas = canvasRef.current;
+      if (!pdf || !canvas) return;
+
+      const clampedPage = Math.max(1, Math.min(pageNum, pdf.numPages));
+
+      // Cancel any in-flight render
+      renderTaskRef.current?.cancel();
+
+      setIsLoading(true);
+      try {
+        const page = await pdf.getPage(clampedPage);
+        const viewport = page.getViewport({ scale });
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        canvas.width  = viewport.width;
+        canvas.height = viewport.height;
+
+        const renderTask = page.render({ canvasContext: ctx, viewport });
+        renderTaskRef.current = renderTask;
+        await renderTask.promise;
+        setIsLoading(false);
+      } catch (err: unknown) {
+        // "RenderingCancelledException" is expected when we cancel — ignore
+        if (err instanceof Error && err.name === "RenderingCancelledException") return;
+        setError(err instanceof Error ? err.message : "Error al renderizar la página");
+        setIsLoading(false);
+      }
+    },
+    [scale]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
+  const handlePrev = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  const handleNext = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
+
+  const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPageInput(e.target.value);
+  };
+
+  const handlePageInputCommit = () => {
+    const parsed = parseInt(pageInput, 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= totalPages) {
+      setCurrentPage(parsed);
+    } else {
+      setPageInput(String(currentPage));
+    }
+  };
+
+  const handleZoomIn  = () => setScale((s) => Math.min(3, parseFloat((s + 0.2).toFixed(1))));
+  const handleZoomOut = () => setScale((s) => Math.max(0.4, parseFloat((s - 0.2).toFixed(1))));
+
+  // ---------------------------------------------------------------------------
+  // Empty state — no manual loaded
+  // ---------------------------------------------------------------------------
+  if (!activeManual) {
+    return (
+      <div className={clsx("flex flex-col items-center justify-center gap-4 text-center px-6", compact ? "h-48" : "h-full")}>
+        <div className="w-14 h-14 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center">
+          <BookOpen className="w-6 h-6 text-zinc-500" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-zinc-300 mb-1">Sin manual activo</p>
+          <p className="text-xs text-zinc-500 leading-relaxed">
+            Cargue un PDF de manual usando el botón <span className="text-zinc-400 font-mono">+ Manual</span> en el panel de piezas.
+          </p>
+        </div>
+      </div>
+    );
   }
 
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   return (
-    <div className="flex flex-col h-full bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
-      <div className="px-5 py-3 border-b border-zinc-800 flex items-center justify-between bg-zinc-900">
-        <div className="flex items-center gap-2">
-          <BookOpen className="w-5 h-5 text-amber-400" />
-          <div>
-            <h2 className="text-sm font-semibold text-zinc-100 uppercase tracking-wider">
-              Manual de Servicio Interactivo
-            </h2>
-            {currentAssembly?.manual_pdf_url && (
-              <p className="text-[11px] text-zinc-400 font-mono">
-                {currentAssembly.manual_pdf_url}
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage <= 1}
-            className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-300"
-            title="Página Anterior"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <span className="text-xs font-mono text-zinc-300 px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700">
-            Página {currentPage} / 12
+    <div className={clsx("flex flex-col bg-zinc-900 overflow-hidden", compact ? "h-full" : "h-full")}>
+      {/* ── Header / Controls ───────────────────────────────────────────── */}
+      <div className="shrink-0 px-3 py-2 border-b border-zinc-800 bg-zinc-900/95 flex items-center justify-between gap-2">
+        {/* Title */}
+        <div className="flex items-center gap-2 min-w-0">
+          <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+          <span className="text-[11px] font-semibold text-zinc-200 truncate" title={activeManual.title}>
+            {activeManual.title}
           </span>
+        </div>
+
+        {/* Page navigation + zoom */}
+        <div className="flex items-center gap-1 shrink-0">
           <button
-            onClick={() => setCurrentPage((p) => Math.min(12, p + 1))}
-            disabled={currentPage >= 12}
-            className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-300"
-            title="Página Siguiente"
+            type="button"
+            onClick={handleZoomOut}
+            title="Reducir zoom"
+            disabled={scale <= 0.4}
+            className="p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 disabled:opacity-30 transition"
           >
-            <ChevronRight className="w-4 h-4" />
+            <ZoomOut className="w-3.5 h-3.5" />
+          </button>
+          <span className="text-[10px] font-mono text-zinc-500 w-8 text-center">{Math.round(scale * 100)}%</span>
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            title="Aumentar zoom"
+            disabled={scale >= 3}
+            className="p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 disabled:opacity-30 transition"
+          >
+            <ZoomIn className="w-3.5 h-3.5" />
+          </button>
+
+          <div className="w-px h-4 bg-zinc-700 mx-1" />
+
+          <button
+            type="button"
+            onClick={handlePrev}
+            disabled={currentPage <= 1}
+            className="p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 disabled:opacity-30 transition"
+            title="Página anterior"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
+
+          <input
+            type="text"
+            value={pageInput}
+            onChange={handlePageInputChange}
+            onBlur={handlePageInputCommit}
+            onKeyDown={(e) => e.key === "Enter" && handlePageInputCommit()}
+            className="w-9 text-center text-[11px] font-mono bg-zinc-800 border border-zinc-700 rounded text-zinc-200 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500/60"
+            aria-label="Número de página"
+          />
+          <span className="text-[10px] text-zinc-500 font-mono">/ {totalPages || "—"}</span>
+
+          <button
+            type="button"
+            onClick={handleNext}
+            disabled={currentPage >= totalPages}
+            className="p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 disabled:opacity-30 transition"
+            title="Página siguiente"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      <div className="flex-1 p-6 overflow-y-auto bg-zinc-950/50 flex flex-col gap-4 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-        {selectedPart && (
-          <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-200 text-xs flex items-start gap-3">
-            <AlertCircle className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
-            <div>
-              <p className="font-semibold text-blue-300">Contexto de Componente Sincronizado:</p>
-              <p className="mt-1">
-                Visualizando instrucciones para <strong>{selectedPart.name}</strong> (OEM:{' '}
-                <span className="font-mono">{selectedPart.oem_code}</span>).
-                {selectedPart.torque_spec && (
-                  <span className="block mt-0.5 text-emerald-400 font-mono">
-                    Torque especificado: {selectedPart.torque_spec}
-                  </span>
-                )}
-              </p>
+      {/* ── Canvas area ─────────────────────────────────────────────────── */}
+      <div className="flex-1 min-h-0 overflow-auto bg-zinc-950/70 flex items-start justify-center p-4 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/60 backdrop-blur-sm z-10">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900 border border-zinc-800 shadow-xl">
+              <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+              <span className="text-xs text-zinc-300">Renderizando…</span>
             </div>
           </div>
         )}
 
-        <div className="flex-1 border border-zinc-800 rounded-lg p-6 bg-zinc-900/60 shadow-inner flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-zinc-400 text-xs uppercase tracking-wider font-mono mb-2">
-              <FileText className="w-4 h-4 text-amber-400" />
-              Sección 4.{currentPage} — Procedimiento de Mantenimiento y Desensamble
-            </div>
-            <h3 className="text-lg font-bold text-zinc-100 mb-4">
-              Paso de Ensamblaje #{currentPage}: Requisitos de Ajuste y Torque
-            </h3>
-            <p className="text-sm text-zinc-300 leading-relaxed mb-4">
-              Asegúrese de que todas las superficies de contacto estén libres de impurezas y desengrasadas. Alinee las guías de posición antes de roscar los pernos primarios. Aplique torquímetro calibrado hasta el límite indicado en patrón cruzado.
-            </p>
-            <div className="p-3 bg-zinc-950 border border-zinc-800 rounded text-xs font-mono text-zinc-400 space-y-1">
-              <div>&gt; Protocolo de Seguridad: Conforme a ISO 12100</div>
-              <div>&gt; Herramienta Recomendada: Torquímetro Calibrado [0-100 Nm]</div>
-              <div>&gt; Lubricación: Aplique grasa antiadherente de alta temperatura donde se indique</div>
-            </div>
+        {error && (
+          <div className="flex items-start gap-2 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs max-w-sm">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
+            <span>{error}</span>
           </div>
+        )}
 
-          <div className="mt-6 pt-4 border-t border-zinc-800 flex justify-between items-center text-xs text-zinc-500">
-            <span>Motor de Documentación Técnica VISION3DPARTS</span>
-            <span>Rev. Doc 2.4</span>
-          </div>
-        </div>
+        <canvas
+          ref={canvasRef}
+          className="shadow-2xl rounded border border-zinc-800 max-w-full"
+          style={{ display: error ? "none" : "block" }}
+        />
       </div>
     </div>
   );

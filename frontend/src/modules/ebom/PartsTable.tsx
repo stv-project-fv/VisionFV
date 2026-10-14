@@ -138,12 +138,20 @@ export const PartsTable: React.FC<PartsTableProps> = ({ headless = false }) => {
   const setSelectedPartId = useAssemblyStore((s) => s.setSelectedPartId);
   const setHoveredPartId  = useAssemblyStore((s) => s.setHoveredPartId);
   const setActiveTab      = useAssemblyStore((s) => s.setActiveTab);
+  const selectPartAndNavigate = useAssemblyStore((s) => s.selectPartAndNavigate);
+  const activeManual      = useAssemblyStore((s) => s.activeManual);
 
   const parts = currentAssembly?.parts ?? [];
 
   const handleOpenManual = (id: string): void => {
-    setSelectedPartId(id);
-    setActiveTab('manual');
+    const part = parts.find((p) => p.id === id);
+    if (part) {
+      selectPartAndNavigate(part);
+    }
+    if (!activeManual) {
+      // No active manual yet — still switch tab so user sees the viewer state
+      setActiveTab('manual');
+    }
   };
 
   const handleSelect = (id: string): void => {
@@ -200,7 +208,7 @@ export const PartsTable: React.FC<PartsTableProps> = ({ headless = false }) => {
       {/* Footer */}
       {parts.length > 0 && (
         <div className="shrink-0 px-3 py-2 border-t border-zinc-800 flex items-center justify-between text-[10px] text-zinc-500 bg-zinc-950/60">
-          <span className="truncate">Clic para seleccionar · 3D sincronizado</span>
+          <span className="truncate">Clic en 📖 para saltar al visor 2D</span>
           {selectedPartId && (
             <button
               type="button"

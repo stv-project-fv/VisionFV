@@ -3,6 +3,7 @@ import type {
   ActiveTab,
   AppView,
   AssemblyDetail,
+  ManualDocument,
   NavigationTreeNode,
   PartEntity,
   VehicleCategory,
@@ -32,6 +33,12 @@ interface AssemblyState {
   isLoading: boolean;
   error: string | null;
 
+  // ── Manual / 2D viewer state ───────────────────────────────────────────────────
+  activeManual: ManualDocument | null;
+  currentPage: number;
+  vehicleManuals: ManualDocument[];
+  isLoadingManuals: boolean;
+
   // ── Tree navigation state ────────────────────────────────────────────────────
   expandedNodeIds: string[];
   selectedNodeId: string | null;
@@ -52,6 +59,13 @@ interface AssemblyState {
   setActiveTab: (tab: ActiveTab) => void;
   resetSelection: () => void;
   getSelectedPart: () => PartEntity | null;
+
+  // ── Manual / 2D viewer actions ──────────────────────────────────────────────
+  setActiveManual: (manual: ManualDocument | null) => void;
+  setCurrentPage: (page: number) => void;
+  fetchVehicleManuals: (vehicleId: string) => Promise<void>;
+  /** Select a part and jump to its manual page if available. */
+  selectPartAndNavigate: (part: PartEntity) => void;
 
   // ── Navigation ───────────────────────────────────────────────────────────────
   setAppView: (view: AppView) => void;
@@ -80,6 +94,11 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
   activeTab: 'split',
   isLoading: false,
   error: null,
+
+  activeManual: null,
+  currentPage: 1,
+  vehicleManuals: [],
+  isLoadingManuals: false,
 
   expandedNodeIds: [],
   selectedNodeId: null,
@@ -163,6 +182,34 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
     const { currentAssembly, selectedPartId } = get();
     if (!currentAssembly || !selectedPartId) return null;
     return currentAssembly.parts.find((p) => p.id === selectedPartId) ?? null;
+  },
+
+  // ── Manual / 2D viewer actions ─────────────────────────────────────────────
+
+  setActiveManual: (manual) => set({ activeManual: manual, currentPage: 1 }),
+
+  setCurrentPage: (page) => set({ currentPage: Math.max(1, page) }),
+
+  fetchVehicleManuals: async (vehicleId: string) => {
+    set({ isLoadingManuals: true });
+    try {
+      const manuals = await api.getVehicleManuals(vehicleId);
+      set({ vehicleManuals: manuals, isLoadingManuals: false });
+    } catch {
+      set({ isLoadingManuals: false });
+    }
+  },
+
+  selectPartAndNavigate: (part: PartEntity) => {
+    const { activeManual } = get();
+    const updates: Partial<AssemblyState> = { selectedPartId: part.id };
+    if (part.manual_page != null) {
+      updates.currentPage = part.manual_page;
+      if (activeManual) {
+        updates.activeTab = 'manual';
+      }
+    }
+    set(updates);
   },
 
   // ── Navigation ─────────────────────────────────────────────────────────────

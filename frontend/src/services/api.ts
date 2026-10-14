@@ -1,4 +1,13 @@
-import type { AssemblyDetail, AssemblyEntity, PartEntity, VehicleCategory, VehicleDetail, VehicleEntity } from '@/types';
+﻿import type {
+  AssemblyDetail,
+  AssemblyEntity,
+  ManualDocument,
+  PartEntity,
+  UploadManualResponse,
+  VehicleCategory,
+  VehicleDetail,
+  VehicleEntity,
+} from '@/types';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1';
@@ -18,8 +27,12 @@ export class ApiError extends Error {
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   try {
+    // Don't force Content-Type for FormData -- browser sets it with multipart boundary
+    const isFormData = options?.body instanceof FormData;
     const response = await fetch(url, {
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      headers: isFormData
+        ? { ...options?.headers }
+        : { 'Content-Type': 'application/json', ...options?.headers },
       ...options,
     });
 
@@ -45,7 +58,7 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  // ── Vehicles ────────────────────────────────────────────────────────────────
+  // -- Vehicles ---------------------------------------------------------------
 
   async getVehicles(category?: VehicleCategory): Promise<VehicleEntity[]> {
     const query = category ? `?category=${encodeURIComponent(category)}` : '';
@@ -56,7 +69,7 @@ export const api = {
     return request<VehicleDetail>(`/vehicles/${encodeURIComponent(id)}`);
   },
 
-  // ── Assemblies ──────────────────────────────────────────────────────────────
+  // -- Assemblies -------------------------------------------------------------
 
   async getAssemblies(category?: string): Promise<AssemblyEntity[]> {
     const query = category ? `?category=${encodeURIComponent(category)}` : '';
@@ -67,7 +80,7 @@ export const api = {
     return request<AssemblyDetail>(`/assemblies/${encodeURIComponent(id)}`);
   },
 
-  // ── Parts ───────────────────────────────────────────────────────────────────
+  // -- Parts ------------------------------------------------------------------
 
   async getParts(assemblyId?: string): Promise<PartEntity[]> {
     const query = assemblyId ? `?assembly_id=${encodeURIComponent(assemblyId)}` : '';
@@ -78,7 +91,25 @@ export const api = {
     return request<PartEntity>(`/parts/${encodeURIComponent(id)}`);
   },
 
-  // ── Seed ────────────────────────────────────────────────────────────────────
+  // -- Manuals ----------------------------------------------------------------
+
+  async getVehicleManuals(vehicleId: string): Promise<ManualDocument[]> {
+    return request<ManualDocument[]>(`/manuals/vehicle/${encodeURIComponent(vehicleId)}`);
+  },
+
+  async uploadManual(formData: FormData): Promise<UploadManualResponse> {
+    return request<UploadManualResponse>('/manuals/upload', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  /** Returns the streaming URL for a manual PDF without fetching. */
+  getManualFileUrl(manualId: string): string {
+    return `${API_BASE_URL}/manuals/file/${encodeURIComponent(manualId)}`;
+  },
+
+  // -- Seed -------------------------------------------------------------------
 
   async seedFleet(): Promise<unknown> {
     return request('/seed/fleet', { method: 'POST' });

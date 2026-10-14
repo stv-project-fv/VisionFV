@@ -63,6 +63,8 @@ htmlcov/
 *.sqlite
 *.sqlite3
 *.db
+uploads/
+backend/uploads/
 
 # IDEs & OS
 .vscode/

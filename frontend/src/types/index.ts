@@ -1,6 +1,25 @@
-// ── Explode vector ────────────────────────────────────────────────────────────
+// ── Explode vector ─────────────────────────────────────────────────────────────────
 
 export type ExplodeVector = [number, number, number];
+
+// ── Manual document types ────────────────────────────────────────────────────
+
+export type DocumentType = 'PARTS_MANUAL' | 'OPERATION_MANUAL';
+
+export interface ManualDocument {
+  readonly id: string;
+  readonly vehicle_id: string;
+  readonly doc_type: DocumentType;
+  readonly title: string;
+  readonly filename: string;
+  readonly total_pages: number;
+  readonly created_at: string;
+}
+
+export interface UploadManualResponse {
+  readonly manual: ManualDocument;
+  readonly parts_extracted: number;
+}
 
 // ── Vehicle types ─────────────────────────────────────────────────────────────
 
@@ -102,6 +121,7 @@ export interface PartEntity {
   readonly category?: string | null;
   readonly torque_spec?: string | null;
   readonly manual_page?: number | null;
+  readonly figure_code?: string | null;
   readonly explode_vector_x: number;
   readonly explode_vector_y: number;
   readonly explode_vector_z: number;
